@@ -136,8 +136,8 @@ AND birthday = '2002-07-27';
 const testQuery = async () => {
   const { createClient } = require('@supabase/supabase-js');
   const supabase = createClient(
-    'https://qaxnyafpunqmfphzrgqe.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFheG55YWZwdW5xbWZwaHpyZ3FlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyOTEyMDgsImV4cCI6MjEwMTg2NzIwOH0.7SNFixhB3zg3sf59UaN8QHAlbipwHK5rCydJQFyxj5M'
+    'YOUR_SUPABASE_URL',  // From .env.local
+    'YOUR_SUPABASE_ANON_KEY'  // From .env.local
   );
   
   const { data, error } = await supabase
