@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900;
+    @apply text-white;
+    @apply min-h-screen;
+    position: relative;
+    overflow-x: hidden;
+  }
+  
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+      radial-gradient(circle at 20% 30%, rgba(139, 195, 74, 0.15) 0%, transparent 50%),
+      radial-gradient(circle at 80% 70%, rgba(126, 87, 194, 0.15) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Buzz Lightyear button effect */
+@keyframes buzz-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(139, 195, 74, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(139, 195, 74, 0.8);
+  }
+}
