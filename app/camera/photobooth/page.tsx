@@ -124,6 +124,21 @@ export default function PhotoBoothSimple() {
     }
   }
 
+  // Helper function to create rounded rectangle path
+  const roundedRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, radius: number) => {
+    ctx.beginPath()
+    ctx.moveTo(x + radius, y)
+    ctx.lineTo(x + w - radius, y)
+    ctx.quadraticCurveTo(x + w, y, x + w, y + radius)
+    ctx.lineTo(x + w, y + h - radius)
+    ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h)
+    ctx.lineTo(x + radius, y + h)
+    ctx.quadraticCurveTo(x, y + h, x, y + h - radius)
+    ctx.lineTo(x, y + radius)
+    ctx.quadraticCurveTo(x, y, x + radius, y)
+    ctx.closePath()
+  }
+
   const generateSingleComposite = async (photos: string[]) => {
     setIsSaving(true)
     
@@ -182,10 +197,9 @@ export default function PhotoBoothSimple() {
       offsetY = -(drawHeight - photoSlot.h) / 2
     }
     
-    // Draw foto (clipped ke slot)
+    // Draw foto (clipped ke slot with rounded corners - SINGLE PHOTO)
     ctx.save()
-    ctx.beginPath()
-    ctx.rect(photoSlot.x, photoSlot.y, photoSlot.w, photoSlot.h)
+    roundedRect(ctx, photoSlot.x, photoSlot.y, photoSlot.w, photoSlot.h, 12)
     ctx.clip()
     ctx.drawImage(
       photoImg, 
@@ -235,7 +249,7 @@ export default function PhotoBoothSimple() {
     // STEP 1: Draw template sebagai background
     ctx.drawImage(templateImg, 0, 0)
     
-    // STEP 2: Draw EACH PHOTO di atas template (clipped ke slot)
+    // STEP 2: Draw EACH PHOTO di atas template (clipped ke slot with rounded corners)
     for (let i = 0; i < photos.length; i++) {
       const photoImg = new Image()
       photoImg.src = photos[i]
@@ -262,10 +276,9 @@ export default function PhotoBoothSimple() {
             offsetY = -(drawHeight - slot.h) / 2
           }
           
-          // Clip photo ke area slot
+          // Clip photo ke area slot with rounded corners
           ctx.save()
-          ctx.beginPath()
-          ctx.rect(slot.x, slot.y, slot.w, slot.h)
+          roundedRect(ctx, slot.x, slot.y, slot.w, slot.h, 12)
           ctx.clip()
           
           // Draw photo centered in slot
@@ -330,7 +343,7 @@ export default function PhotoBoothSimple() {
     // STEP 1: Draw template sebagai background
     ctx.drawImage(templateImg, 0, 0)
     
-    // STEP 2: Draw foto user di atas template (clipped ke photo slot)
+    // STEP 2: Draw foto user di atas template (clipped ke photo slot with rounded corners)
     const imgAspect = photoImg.width / photoImg.height
     const slotAspect = photoSlot.w / photoSlot.h
     
@@ -348,10 +361,9 @@ export default function PhotoBoothSimple() {
       offsetY = -(drawHeight - photoSlot.h) / 2
     }
     
-    // Draw foto (clipped ke slot)
+    // Draw foto (clipped ke slot with rounded corners)
     ctx.save()
-    ctx.beginPath()
-    ctx.rect(photoSlot.x, photoSlot.y, photoSlot.w, photoSlot.h)
+    roundedRect(ctx, photoSlot.x, photoSlot.y, photoSlot.w, photoSlot.h, 12)
     ctx.clip()
     ctx.drawImage(
       photoImg, 
@@ -400,7 +412,7 @@ export default function PhotoBoothSimple() {
     // STEP 1: Draw template sebagai background
     ctx.drawImage(templateImg, 0, 0)
     
-    // STEP 2: Draw EACH PHOTO di atas template (clipped ke slot)
+    // STEP 2: Draw EACH PHOTO di atas template (clipped ke slot with rounded corners)
     for (let i = 0; i < photos.length && i < photoSlots.length; i++) {
       const photoImg = new Image()
       photoImg.src = photos[i]
@@ -427,10 +439,9 @@ export default function PhotoBoothSimple() {
             offsetY = -(drawHeight - slot.h) / 2
           }
           
-          // Clip photo ke area slot
+          // Clip photo ke area slot with rounded corners
           ctx.save()
-          ctx.beginPath()
-          ctx.rect(slot.x, slot.y, slot.w, slot.h)
+          roundedRect(ctx, slot.x, slot.y, slot.w, slot.h, 12)
           ctx.clip()
           
           // Draw photo centered in slot
@@ -607,7 +618,7 @@ export default function PhotoBoothSimple() {
             {capturedPhotos.length > 0 && (
               <div className="flex gap-2 justify-center">
                 {capturedPhotos.map((photo, i) => (
-                  <img key={i} src={photo} alt={`Photo ${i + 1}`} className="w-20 h-20 object-cover rounded-lg border-2 border-green-500" />
+                  <img key={i} src={photo} alt={`Photo ${i + 1}`} className="w-20 h-20 object-cover rounded-xl border-2 border-green-500" />
                 ))}
               </div>
             )}

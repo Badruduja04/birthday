@@ -33,6 +33,18 @@ export default function MusicPage() {
   const [showEditModal, setShowEditModal] = useState(false)
   const [showSortMenu, setShowSortMenu] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState<string | null>(null)
+  const [showNotification, setShowNotification] = useState<{
+    show: boolean
+    type: 'success' | 'error' | 'confirm'
+    title: string
+    message: string
+    onConfirm?: () => void
+  }>({
+    show: false,
+    type: 'success',
+    title: '',
+    message: ''
+  })
   const sortButtonRef = useRef<HTMLButtonElement>(null)
   const [sortMenuPosition, setSortMenuPosition] = useState({ top: 0, right: 0 })
   const [mounted, setMounted] = useState(false)
@@ -158,13 +170,23 @@ export default function MusicPage() {
 
     // Validate file type
     if (!file.type.startsWith('audio/')) {
-      alert('Please select an audio file (MP3, WAV, etc.)')
+      setShowNotification({
+        show: true,
+        type: 'error',
+        title: 'Invalid File Type',
+        message: 'Please select an audio file (MP3, WAV, M4A, etc.)'
+      })
       return
     }
 
     // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      alert('File size must be less than 10MB')
+      setShowNotification({
+        show: true,
+        type: 'error',
+        title: 'File Too Large',
+        message: 'File size must be less than 10MB'
+      })
       return
     }
 
@@ -176,7 +198,12 @@ export default function MusicPage() {
 
   const handleUpload = async () => {
     if (!uploadFile || !uploadTitle.trim()) {
-      alert('Please select a file and enter a title')
+      setShowNotification({
+        show: true,
+        type: 'error',
+        title: 'Missing Information',
+        message: 'Please select a file and enter a title'
+      })
       return
     }
 
@@ -256,11 +283,21 @@ export default function MusicPage() {
       setShowUploadModal(false)
       setUploadProgress(0)
 
-      alert('✅ Song uploaded successfully!')
+      setShowNotification({
+        show: true,
+        type: 'success',
+        title: 'Success!',
+        message: `"${uploadTitle}" has been added to your playlist`
+      })
 
     } catch (err: any) {
       console.error('Upload error:', err)
-      alert('❌ Failed to upload: ' + err.message)
+      setShowNotification({
+        show: true,
+        type: 'error',
+        title: 'Upload Failed',
+        message: err.message || 'Failed to upload song'
+      })
       setUploadProgress(0)
     } finally {
       setIsUploading(false)
@@ -290,7 +327,12 @@ export default function MusicPage() {
       setShowMoreMenu(null) // Close menu after action
     } catch (error) {
       console.error('Playback error:', error)
-      alert('❌ Failed to play audio. Please check if the file is accessible.')
+      setShowNotification({
+        show: true,
+        type: 'error',
+        title: 'Playback Error',
+        message: 'Failed to play audio. Please check if the file is accessible.'
+      })
       setIsPlaying(false)
       setCurrentPlaying(null)
     }
@@ -306,7 +348,12 @@ export default function MusicPage() {
 
   const handleEditSave = async () => {
     if (!editingSong || !editTitle.trim()) {
-      alert('Title is required')
+      setShowNotification({
+        show: true,
+        type: 'error',
+        title: 'Title Required',
+        message: 'Please enter a song title'
+      })
       return
     }
 
@@ -326,70 +373,93 @@ export default function MusicPage() {
 
       setShowEditModal(false)
       setEditingSong(null)
-      alert('✅ Song updated successfully!')
+      
+      setShowNotification({
+        show: true,
+        type: 'success',
+        title: 'Updated!',
+        message: `"${editTitle}" has been updated`
+      })
 
     } catch (err: any) {
       console.error('Edit error:', err)
-      alert('❌ Failed to update: ' + err.message)
+      setShowNotification({
+        show: true,
+        type: 'error',
+        title: 'Update Failed',
+        message: err.message || 'Failed to update song'
+      })
     }
   }
 
   const handleDelete = async (musicId: string, filePath: string, songTitle: string) => {
-    console.log('Delete clicked:', { musicId, filePath, songTitle })
-    
-    if (!confirm(`Delete "${songTitle}"?\n\nThis action cannot be undone.`)) {
-      console.log('Delete cancelled by user')
-      return
-    }
+    setShowNotification({
+      show: true,
+      type: 'confirm',
+      title: 'Delete Song?',
+      message: `Are you sure you want to delete "${songTitle}"? This action cannot be undone.`,
+      onConfirm: async () => {
+        console.log('Delete confirmed, proceeding...')
 
-    console.log('User confirmed delete, proceeding...')
+        try {
+          // Delete from database
+          console.log('Deleting from database...')
+          const { error: dbError } = await supabase
+            .from('music')
+            .delete()
+            .eq('id', musicId)
 
-    try {
-      // Delete from database
-      console.log('Deleting from database...')
-      const { error: dbError } = await supabase
-        .from('music')
-        .delete()
-        .eq('id', musicId)
+          if (dbError) {
+            console.error('Database delete error:', dbError)
+            throw dbError
+          }
+          console.log('Database delete successful')
 
-      if (dbError) {
-        console.error('Database delete error:', dbError)
-        throw dbError
+          // Delete from storage
+          console.log('Deleting from storage:', filePath)
+          const { error: storageError } = await supabase.storage
+            .from('music')
+            .remove([filePath])
+
+          if (storageError) {
+            console.error('Storage delete error:', storageError)
+          } else {
+            console.log('Storage delete successful')
+          }
+
+          // Reload list
+          console.log('Reloading music list...')
+          const user = getCurrentUser()
+          if (user) await loadMusic(user.id)
+
+          // Stop if currently playing
+          if (currentPlaying === musicId) {
+            audioRef.current?.pause()
+            setCurrentPlaying(null)
+            setIsPlaying(false)
+          }
+
+          setShowMoreMenu(null)
+          console.log('Delete completed successfully')
+          
+          setShowNotification({
+            show: true,
+            type: 'success',
+            title: 'Deleted!',
+            message: `"${songTitle}" has been removed from your playlist`
+          })
+
+        } catch (err: any) {
+          console.error('Delete error:', err)
+          setShowNotification({
+            show: true,
+            type: 'error',
+            title: 'Delete Failed',
+            message: err.message || 'Failed to delete song'
+          })
+        }
       }
-      console.log('Database delete successful')
-
-      // Delete from storage
-      console.log('Deleting from storage:', filePath)
-      const { error: storageError } = await supabase.storage
-        .from('music')
-        .remove([filePath])
-
-      if (storageError) {
-        console.error('Storage delete error:', storageError)
-      } else {
-        console.log('Storage delete successful')
-      }
-
-      // Reload list
-      console.log('Reloading music list...')
-      const user = getCurrentUser()
-      if (user) await loadMusic(user.id)
-
-      // Stop if currently playing
-      if (currentPlaying === musicId) {
-        audioRef.current?.pause()
-        setCurrentPlaying(null)
-        setIsPlaying(false)
-      }
-
-      setShowMoreMenu(null)
-      console.log('Delete completed successfully')
-      alert('✅ Song deleted successfully!')
-
-    } catch (err: any) {
-      console.error('Delete error:', err)
-      alert('❌ Failed to delete: ' + err.message)
-    }
+    })
   }
 
   const handleReorder = async (newOrder: Music[]) => {
@@ -967,6 +1037,99 @@ export default function MusicPage() {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Notification Modal */}
+      <AnimatePresence>
+        {showNotification.show && createPortal(
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+            style={{ zIndex: 10000 }}
+            onClick={() => setShowNotification({ ...showNotification, show: false })}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className={`
+                max-w-md w-full rounded-2xl p-6 shadow-2xl border-2
+                ${showNotification.type === 'success' 
+                  ? 'bg-gradient-to-br from-green-900/90 to-emerald-900/90 border-green-500/30' 
+                  : showNotification.type === 'error'
+                  ? 'bg-gradient-to-br from-red-900/90 to-rose-900/90 border-red-500/30'
+                  : 'bg-gradient-to-br from-gray-900/90 to-gray-800/90 border-white/20'
+                }
+                backdrop-blur-lg
+              `}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Icon */}
+              <div className="flex justify-center mb-4">
+                <div className={`
+                  w-16 h-16 rounded-full flex items-center justify-center text-3xl
+                  ${showNotification.type === 'success' 
+                    ? 'bg-green-500/20' 
+                    : showNotification.type === 'error'
+                    ? 'bg-red-500/20'
+                    : 'bg-yellow-500/20'
+                  }
+                `}>
+                  {showNotification.type === 'success' ? '✓' : showNotification.type === 'error' ? '✕' : '?'}
+                </div>
+              </div>
+
+              {/* Title */}
+              <h3 className="text-2xl font-bold text-white text-center mb-2">
+                {showNotification.title}
+              </h3>
+
+              {/* Message */}
+              <p className="text-white/80 text-center mb-6">
+                {showNotification.message}
+              </p>
+
+              {/* Buttons */}
+              <div className="flex gap-3">
+                {showNotification.type === 'confirm' ? (
+                  <>
+                    <button
+                      onClick={() => setShowNotification({ ...showNotification, show: false })}
+                      className="flex-1 px-6 py-3 bg-white/10 hover:bg-white/20 rounded-full text-white font-medium transition-all duration-300"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowNotification({ ...showNotification, show: false })
+                        showNotification.onConfirm?.()
+                      }}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 rounded-full text-white font-bold transition-all duration-300"
+                    >
+                      Delete
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setShowNotification({ ...showNotification, show: false })}
+                    className={`
+                      w-full px-6 py-3 rounded-full text-white font-bold transition-all duration-300
+                      ${showNotification.type === 'success'
+                        ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600'
+                        : 'bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600'
+                      }
+                    `}
+                  >
+                    OK
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>,
+          document.body
         )}
       </AnimatePresence>
     </main>
