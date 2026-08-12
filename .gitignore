@@ -31,3 +31,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Backup files
+*.backup.*
+*-backup.*
+*-old.*
+page-backup-*.tsx
+page-simple-working.tsx
+BookTab.backup.tsx
+
+# Test files
+test*.png
