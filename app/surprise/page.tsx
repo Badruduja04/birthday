@@ -1008,7 +1008,7 @@ export default function SurprisePage() {
                 >
                   <p className="text-gray-700 text-base md:text-lg leading-relaxed">
                   happy brithday olla, maap nyak telat ngucapin kemarin
-                  semoga di ulang tahun yang ke 24 sekarang sehat-sehat deh ya la sama lingkungannya, semangat kerjaannya yang kita sama-sama first time jadi guru kkkkkk, semoga nanti hubungannya yang ga bikin ldr lagi:v, makin banyak rezekinya la, biar nanti kali" bisa ke bogor 
+                  semoga di ulang tahun yang ke 24 sekarang sehat-sehat deh ya la sama lingkungannya, semangat kerjaannya yang kita sama-sama first time jadi guru kkkkkk, semoga nanti hubungannya yang ga bikin ldr lagi:v, makin banyak rezekinya la, biar nanti kali&quot; bisa ke bogor 
                 sorry kalau ini masih belum maksimal, nanti mah bisa di update lagi anauannya kkkkkk, pokoknya mah 
                   </p>
                   <p className="text-gray-800 text-lg md:text-xl font-semibold italic">
