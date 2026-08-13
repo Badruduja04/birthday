@@ -390,7 +390,7 @@ export default function LoginPage() {
               className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 mx-auto rounded-3xl overflow-hidden bg-gradient-to-br from-white/10 to-transparent backdrop-blur-sm border-4 border-buzz-green/30"
             >
               <img 
-                src="/buzz/download (1),jpg"
+                src="/buzz/download (1).jpg"
                 alt="Buzz Lightyear"
                 className="w-full h-full object-contain p-1"
               />
