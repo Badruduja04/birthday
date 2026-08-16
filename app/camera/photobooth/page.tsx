@@ -99,7 +99,12 @@ export default function PhotoBoothSimple() {
     
     const ctx = canvas.getContext('2d')
     if (ctx) {
-      ctx.drawImage(video, 0, 0)
+      // Flip horizontal to un-mirror the photo (video is mirrored for preview)
+      ctx.save()
+      ctx.scale(-1, 1) // Flip horizontally
+      ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height)
+      ctx.restore()
+      
       const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
       
       const newPhotos = [...capturedPhotos, dataUrl]
@@ -169,9 +174,9 @@ export default function PhotoBoothSimple() {
     // Define photo slot area in template (koordinat area foto pada template)
     const photoSlot = {
       x: 230,
-      y: 290,
+      y: 270,
       w: 610,
-      h: 790
+      h: 840
     }
     
     // === SIMPLE: Template background + Foto ===
@@ -240,8 +245,14 @@ export default function PhotoBoothSimple() {
     
     // Define photo slots (koordinat area foto pada template)
     const photoSlots = [
-      { x: 213, y: 173, w: 495, h: 410 },  // Top photo slot
-      { x: 213, y: 620, w: 495, h: 340 }   // Bottom photo slot
+      { x: 235,
+        y: 250, 
+        w: 550, 
+        h: 420 },  // Top photo slot
+      { x: 235, 
+        y: 710, 
+        w: 550, 
+        h: 420 }   // Bottom photo slot
     ]
     
     // === SIMPLE: Template background + Foto ===
@@ -334,10 +345,10 @@ export default function PhotoBoothSimple() {
     
     // Define photo slot area - SAME AS foto `1.png (ukuran sama)
     const photoSlot = {
-      x: 248,
-      y: 220,
-      w: 600,
-      h: 800
+      x: 241,
+      y: 215,
+      w: 607,
+      h: 810
     }
     
     // STEP 1: Draw template sebagai background
@@ -578,7 +589,10 @@ export default function PhotoBoothSimple() {
                 playsInline
                 muted
                 className="w-full h-full object-cover"
-                style={{ display: 'block' }}
+                style={{ 
+                  display: 'block',
+                  transform: 'scaleX(-1)' // Mirror effect for live preview
+                }}
               />
               
               {/* Countdown Overlay */}

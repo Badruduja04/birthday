@@ -122,9 +122,9 @@ export default function HomePage() {
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId)
 
-      // Fetch diary count (assuming you have a diary table)
+      // Fetch diary entries count
       const { count: diaryCount } = await supabase
-        .from('diary')
+        .from('diary_entries')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId)
 

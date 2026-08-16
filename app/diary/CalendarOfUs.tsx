@@ -318,12 +318,19 @@ export default function CalendarOfUs({ userId }: CalendarOfUsProps) {
       const fileName = `${userId}-${Date.now()}.${fileExt}`
       const filePath = `diary-events/${fileName}`
 
-      // Upload to Supabase Storage
+      // Fix MIME type for m4a files
+      let contentType = file.type
+      if (file.type === 'audio/x-m4a' || fileExt === 'm4a') {
+        contentType = 'audio/mp4' // Supabase accepts audio/mp4 for m4a files
+      }
+
+      // Upload to Supabase Storage with correct content type
       const { error: uploadError } = await supabase.storage
         .from('diary-music')
         .upload(filePath, file, {
           cacheControl: '3600',
-          upsert: false
+          upsert: false,
+          contentType: contentType
         })
 
       if (uploadError) throw uploadError
