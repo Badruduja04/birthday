@@ -6,6 +6,10 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth/auth'
 import CalendarOfUs from './CalendarOfUs'
+import DailyJournal from './tabs/DailyJournal'
+import MonthlyPlanner from './tabs/MonthlyPlanner'
+
+type TabType = 'memories' | 'daily' | 'monthly'
 
 export default function DiaryPage() {
   const router = useRouter()
@@ -14,6 +18,7 @@ export default function DiaryPage() {
   const [userName, setUserName] = useState<string>('')
   const [greeting, setGreeting] = useState('')
   const [currentDate, setCurrentDate] = useState('')
+  const [activeTab, setActiveTab] = useState<TabType>('memories')
 
   useEffect(() => {
     const user = getCurrentUser()
@@ -191,15 +196,82 @@ export default function DiaryPage() {
           </motion.div>
         </motion.div>
 
-        {/* Calendar Component */}
+        {/* Tab Navigation */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
+          className="mb-6"
         >
-          <CalendarOfUs userId={userId} />
+          <div className="flex gap-3 bg-white/10 backdrop-blur-md rounded-2xl p-2 shadow-lg border border-white/20">
+            <TabButton
+              active={activeTab === 'memories'}
+              onClick={() => setActiveTab('memories')}
+              icon="💝"
+              label="Memories"
+            />
+            <TabButton
+              active={activeTab === 'daily'}
+              onClick={() => setActiveTab('daily')}
+              icon="📔"
+              label="Daily"
+            />
+            <TabButton
+              active={activeTab === 'monthly'}
+              onClick={() => setActiveTab('monthly')}
+              icon="📅"
+              label="Monthly"
+            />
+          </div>
         </motion.div>
+
+        {/* Tab Content */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            {activeTab === 'memories' && <CalendarOfUs userId={userId} />}
+            {activeTab === 'daily' && <DailyJournal userId={userId} />}
+            {activeTab === 'monthly' && <MonthlyPlanner userId={userId} />}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </main>
+  )
+}
+
+// Tab Button Component
+function TabButton({ 
+  active, 
+  onClick, 
+  icon, 
+  label 
+}: { 
+  active: boolean
+  onClick: () => void
+  icon: string
+  label: string
+}) {
+  return (
+    <motion.button
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={onClick}
+      className={`
+        flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl
+        font-medium transition-all duration-200
+        ${active 
+          ? 'bg-white text-purple-900 shadow-lg' 
+          : 'text-white/80 hover:text-white hover:bg-white/5'
+        }
+      `}
+    >
+      <span className="text-xl">{icon}</span>
+      <span className="text-sm md:text-base">{label}</span>
+    </motion.button>
   )
 }
