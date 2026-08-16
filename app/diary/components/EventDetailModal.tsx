@@ -319,11 +319,7 @@ export default function EventDetailModal({
               Close
             </button>
             <button
-              onClick={() => {
-                if (confirm('Are you sure you want to delete this event?')) {
-                  onDelete(event.id)
-                }
-              }}
+              onClick={() => onDelete(event.id)}
               className="flex-1 px-6 py-3 bg-red-500/50 hover:bg-red-600/60 rounded-full text-white font-medium transition-all duration-300 border border-white/30"
             >
               Delete

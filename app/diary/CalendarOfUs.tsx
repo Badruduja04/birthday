@@ -48,6 +48,10 @@ export default function CalendarOfUs({ userId }: CalendarOfUsProps) {
   const [showEventPicker, setShowEventPicker] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [selectedDateEvents, setSelectedDateEvents] = useState<CalendarEvent[]>([])
+  
+  // Confirmation modal state
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false)
+  const [eventToDelete, setEventToDelete] = useState<string | null>(null)
   const [currentEventIndex, setCurrentEventIndex] = useState(0)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -428,11 +432,19 @@ export default function CalendarOfUs({ userId }: CalendarOfUsProps) {
   }
 
   const handleDeleteEvent = async (eventId: string) => {
+    // Show confirmation modal instead of alert
+    setEventToDelete(eventId)
+    setShowConfirmDelete(true)
+  }
+  
+  const confirmDelete = async () => {
+    if (!eventToDelete) return
+    
     try {
       const { error } = await supabase
         .from('calendar_events')
         .delete()
-        .eq('id', eventId)
+        .eq('id', eventToDelete)
 
       if (error) throw error
 
@@ -440,10 +452,17 @@ export default function CalendarOfUs({ userId }: CalendarOfUsProps) {
       await loadAllEvents()
       handleCloseEventDetail()
       setClickedDate(null)
+      setShowConfirmDelete(false)
+      setEventToDelete(null)
     } catch (err: any) {
       console.error('Delete event error:', err)
       alert('Failed to delete: ' + err.message)
     }
+  }
+  
+  const cancelDelete = () => {
+    setShowConfirmDelete(false)
+    setEventToDelete(null)
   }
 
   const handleEditEvent = (event: CalendarEvent) => {
@@ -1378,6 +1397,79 @@ export default function CalendarOfUs({ userId }: CalendarOfUsProps) {
             currentIndex={currentEventIndex}
             totalEvents={selectedDateEvents.length}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Custom Confirmation Modal */}
+      <AnimatePresence>
+        {showConfirmDelete && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4"
+            onClick={cancelDelete}
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.8, opacity: 0, y: 20 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Icon */}
+              <motion.div
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
+                className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-red-400 to-pink-500 rounded-full flex items-center justify-center shadow-lg"
+              >
+                <span className="text-4xl">🗑️</span>
+              </motion.div>
+
+              {/* Title */}
+              <motion.h3
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="text-2xl font-bold text-gray-800 text-center mb-3"
+              >
+                Delete Memory?
+              </motion.h3>
+
+              {/* Description */}
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="text-gray-600 text-center mb-8 leading-relaxed"
+              >
+                Are you sure you want to delete this memory? This action cannot be undone.
+              </motion.p>
+
+              {/* Buttons */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="flex gap-3"
+              >
+                <button
+                  onClick={cancelDelete}
+                  className="flex-1 px-6 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl text-gray-700 font-semibold transition-all duration-200 hover:shadow-md"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 rounded-xl text-white font-semibold transition-all duration-200 hover:shadow-lg shadow-red-200"
+                >
+                  Delete
+                </button>
+              </motion.div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
