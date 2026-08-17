@@ -19,14 +19,16 @@ A beautiful, interactive web application built with Next.js 14 and Supabase, fea
 - Session management with localStorage
 - Protected routes
 
-### 📅 Diary - Calendar of Us
-- Interactive calendar with event management
-- 3 view modes: Timeline, Book, and Highlights
-- Event types: Date, Gift, Special, Memory
-- Photo attachments for events
-- Audio recordings for special moments
-- Music track associations
-- Search functionality
+### 📅 Diary - Personal Journal & Planning
+Full-featured diary with multiple views:
+- **Calendar of Us**: Interactive calendar with events (Memory, Photo, Message, Birthday, Special)
+- **Daily Journal**: Daily todo lists, mood tracking, reflections, photo of the day
+- **Monthly Planner**: Focus themes, goals, priorities, habit tracker, gratitude list
+- **Timeline**: Chronological event view with filters
+- **Book View**: Aesthetic scrapbook-style layout
+- **Highlights**: Featured special moments
+- Photo & audio attachments
+- Search and filter functionality
 - Beautiful animations with Framer Motion
 
 ### 🎵 Music Library
@@ -117,12 +119,24 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 4. **Database setup:**
 
 Run SQL migrations in `database/` folder (in order):
-- `setup_storage.sql` - Setup storage buckets
-- `create_diary_entries_table.sql` - Create diary table
-- `setup_calendar_events.sql` - Create calendar events
-- `setup_music_table.sql` - Create music table
-- `add_manual_order_to_music.sql` - Add manual ordering
-- Other fixes as needed
+```bash
+# 1. Core tables
+database/planner_tables.sql          # Daily journals, monthly planners, habits
+database/setup_calendar_events.sql   # Calendar events
+database/setup_music_table.sql       # Music library
+database/add_manual_order_to_music.sql
+
+# 2. Policies & fixes
+database/fix_rls_policies.sql        # Row level security
+database/fix_month_format.sql        # Fix date formats
+
+# 3. Storage buckets
+database/setup_storage.sql           # Setup storage buckets
+```
+
+Or run all at once in Supabase SQL Editor.
+
+See `STORAGE_SETUP.md` for storage bucket configuration.
 
 5. **Run development server:**
 ```bash
@@ -168,14 +182,17 @@ project/
 
 ### Tables:
 - **profiles** - User profiles (username, birthday, display_name)
-- **diary_entries** - Calendar events with photos, audio, music
+- **calendar_events** - Calendar events with photos, audio, music
+- **daily_journals** - Daily todo, mood tracking, reflections, photos
+- **monthly_planners** - Monthly goals, priorities, focus themes, gratitude
+- **habit_tracker** - Habit tracking by month
 - **music** - Music library with metadata
-- **diary_images** - Photo storage for memories
 
 ### Storage Buckets:
-- **diary-images** - Event photos and memories
-- **diary-audio** - Audio recordings
-- **music** - Music files
+- **diary-images** - Event photos, daily journal photos, and memories
+- **diary-music** - Audio recordings and music files
+
+See `STORAGE_SETUP.md` for detailed configuration.
 
 ---
 
@@ -230,7 +247,16 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 
 ## 📝 Recent Updates
 
-### Latest (2026-08-12):
+### Latest (2026-08-16): 🐛 Diary Bug Fixes
+- ✅ Fixed Daily Journal photo upload (now uses `diary-images` bucket)
+- ✅ Fixed Monthly Planner 406 errors (proper date format)
+- ✅ Auto-save after photo upload completion
+- ✅ Added error handling and loading states
+- ✅ Storage setup documentation
+- ✅ SQL script to fix existing data format
+- 📖 See `DIARY_BUG_FIXES.md` for detailed information
+
+### Previous (2026-08-12):
 - ✅ Enhanced music page notifications (custom modals)
 - ✅ Added 12px border-radius to photobooth photos
 - ✅ Portal rendering for z-index fixes
@@ -249,6 +275,13 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 ## 🐛 Known Issues
 
 None currently! 🎉
+
+**Fixed Issues:**
+- ✅ Daily Journal photo upload (Fixed: 2026-08-16)
+- ✅ Monthly Planner 406 errors (Fixed: 2026-08-16)
+- ✅ Data not saving properly (Fixed: 2026-08-16)
+
+See `DIARY_BUG_FIXES.md` for troubleshooting guide.
 
 ---
 

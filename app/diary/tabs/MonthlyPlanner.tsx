@@ -56,6 +56,32 @@ export default function MonthlyPlanner({ userId }: MonthlyPlannerProps) {
   const [showHabitForm, setShowHabitForm] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [recentMonths, setRecentMonths] = useState<string[]>([])
+
+  // Load recent planner months
+  useEffect(() => {
+    const loadRecentMonths = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('monthly_planners')
+          .select('month')
+          .eq('user_id', userId)
+          .order('month', { ascending: false })
+          .limit(6)
+
+        if (error) throw error
+
+        if (data) {
+          setRecentMonths(data.map(d => d.month))
+        }
+      } catch (error) {
+        console.error('Error loading recent months:', error)
+      }
+    }
+
+    loadRecentMonths()
+  }, [userId, saveSuccess])
 
   useEffect(() => {
     loadMonthData()
@@ -128,15 +154,30 @@ export default function MonthlyPlanner({ userId }: MonthlyPlannerProps) {
     }
   }
 
-  const savePlannerData = async (updatedData: Partial<PlannerData>) => {
+  const savePlannerData = async (updatedData: Partial<PlannerData> = {}) => {
     setIsSaving(true)
+    setSaveSuccess(false)
     try {
+      // ALWAYS use first day of current month - don't trust state or updatedData
+      const correctMonth = getFirstDayOfMonth(currentMonth)
+      
+      // Merge data explicitly without month
+      const mergedData = { 
+        ...plannerData, 
+        ...updatedData 
+      }
+      
       const dataToSave = {
         user_id: userId,
-        ...plannerData,
-        ...updatedData,
-        month: getFirstDayOfMonth(currentMonth),
+        month: correctMonth,  // Set month FIRST with correct value
+        focus_theme: mergedData.focus_theme || null,
+        goals: mergedData.goals || [],
+        priorities: mergedData.priorities || [],
+        notes: mergedData.notes || null,
+        gratitude_list: mergedData.gratitude_list || [],
       }
+
+      console.log('Saving planner with month:', correctMonth, dataToSave)
 
       const { data, error } = await supabase
         .from('monthly_planners')
@@ -144,14 +185,19 @@ export default function MonthlyPlanner({ userId }: MonthlyPlannerProps) {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase error:', error)
+        throw error
+      }
 
       if (data) {
-        setPlannerData(prev => ({ ...prev, id: data.id }))
+        setPlannerData(prev => ({ ...prev, id: data.id, month: correctMonth }))
+        setSaveSuccess(true)
+        setTimeout(() => setSaveSuccess(false), 3000)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving planner:', error)
-      alert('Failed to save. Please try again.')
+      alert(`Failed to save: ${error.message || 'Please check database setup'}`)
     } finally {
       setIsSaving(false)
     }
@@ -161,7 +207,6 @@ export default function MonthlyPlanner({ userId }: MonthlyPlannerProps) {
     if (newGoal.trim()) {
       const updated = [...plannerData.goals, newGoal.trim()]
       setPlannerData(prev => ({ ...prev, goals: updated }))
-      savePlannerData({ goals: updated })
       setNewGoal('')
     }
   }
@@ -169,14 +214,12 @@ export default function MonthlyPlanner({ userId }: MonthlyPlannerProps) {
   const removeGoal = (index: number) => {
     const updated = plannerData.goals.filter((_, i) => i !== index)
     setPlannerData(prev => ({ ...prev, goals: updated }))
-    savePlannerData({ goals: updated })
   }
 
   const addPriority = () => {
     if (newPriority.trim() && plannerData.priorities.length < 5) {
       const updated = [...plannerData.priorities, newPriority.trim()]
       setPlannerData(prev => ({ ...prev, priorities: updated }))
-      savePlannerData({ priorities: updated })
       setNewPriority('')
     }
   }
@@ -184,14 +227,12 @@ export default function MonthlyPlanner({ userId }: MonthlyPlannerProps) {
   const removePriority = (index: number) => {
     const updated = plannerData.priorities.filter((_, i) => i !== index)
     setPlannerData(prev => ({ ...prev, priorities: updated }))
-    savePlannerData({ priorities: updated })
   }
 
   const addGratitude = () => {
     if (newGratitude.trim()) {
       const updated = [...plannerData.gratitude_list, newGratitude.trim()]
       setPlannerData(prev => ({ ...prev, gratitude_list: updated }))
-      savePlannerData({ gratitude_list: updated })
       setNewGratitude('')
     }
   }
@@ -199,7 +240,6 @@ export default function MonthlyPlanner({ userId }: MonthlyPlannerProps) {
   const removeGratitude = (index: number) => {
     const updated = plannerData.gratitude_list.filter((_, i) => i !== index)
     setPlannerData(prev => ({ ...prev, gratitude_list: updated }))
-    savePlannerData({ gratitude_list: updated })
   }
 
   const addHabit = async () => {
@@ -299,29 +339,60 @@ export default function MonthlyPlanner({ userId }: MonthlyPlannerProps) {
 
   return (
     <div className="space-y-6">
-      {/* Month Navigation */}
+      {/* Month Navigation with Recent History */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between bg-white/10 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-white/20"
+        className="bg-white/10 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-white/20 space-y-4"
       >
-        <button
-          onClick={() => changeMonth('prev')}
-          className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-        >
-          <ChevronLeft size={24} className="text-white" />
-        </button>
-        
-        <h2 className="text-2xl font-bold text-white">
-          📅 {monthName}
-        </h2>
-        
-        <button
-          onClick={() => changeMonth('next')}
-          className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-        >
-          <ChevronRight size={24} className="text-white" />
-        </button>
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => changeMonth('prev')}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <ChevronLeft size={24} className="text-white" />
+          </button>
+          
+          <h2 className="text-2xl font-bold text-white">
+            📅 {monthName}
+          </h2>
+          
+          <button
+            onClick={() => changeMonth('next')}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <ChevronRight size={24} className="text-white" />
+          </button>
+        </div>
+
+        {/* Recent Planner Months */}
+        {recentMonths.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-white/60 text-xs font-medium">Recent planners:</p>
+            <div className="flex gap-2 flex-wrap">
+              {recentMonths.map(month => {
+                const monthDate = new Date(month + 'T00:00:00')
+                const isActive = getFirstDayOfMonth(currentMonth) === month
+                return (
+                  <button
+                    key={month}
+                    onClick={() => setCurrentMonth(monthDate)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      isActive
+                        ? 'bg-purple-500 text-white shadow-lg'
+                        : 'bg-white/20 text-white/80 hover:bg-white/30'
+                    }`}
+                  >
+                    {monthDate.toLocaleDateString('en-US', {
+                      month: 'short',
+                      year: 'numeric'
+                    })}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </motion.div>
 
       {/* Focus Theme */}
@@ -336,7 +407,6 @@ export default function MonthlyPlanner({ userId }: MonthlyPlannerProps) {
           type="text"
           value={plannerData.focus_theme}
           onChange={(e) => setPlannerData(prev => ({ ...prev, focus_theme: e.target.value }))}
-          onBlur={() => savePlannerData({ focus_theme: plannerData.focus_theme })}
           placeholder="plan with purpose. stay positive. make it happen. ♡"
           className="w-full px-4 py-3 rounded-xl bg-white/70 border border-gray-300 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-pink-400"
         />
@@ -596,17 +666,76 @@ export default function MonthlyPlanner({ userId }: MonthlyPlannerProps) {
         <textarea
           value={plannerData.notes}
           onChange={(e) => setPlannerData(prev => ({ ...prev, notes: e.target.value }))}
-          onBlur={() => savePlannerData({ notes: plannerData.notes })}
           placeholder="Write your thoughts, ideas, reminders..."
           rows={5}
           className="w-full px-4 py-3 rounded-xl bg-white/60 border border-gray-300 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
         />
       </motion.div>
 
-      {/* Save Status */}
+      {/* Manual Save Button */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.7 }}
+        className="flex gap-3"
+      >
+        <button
+          onClick={() => savePlannerData({})}
+          disabled={isSaving}
+          className="flex-1 px-6 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isSaving ? 'Saving...' : '💾 Save Planner'}
+        </button>
+        
+        {plannerData.id && (
+          <button
+            onClick={async () => {
+              if (confirm('Delete this month\'s planner?')) {
+                try {
+                  const { error } = await supabase
+                    .from('monthly_planners')
+                    .delete()
+                    .eq('id', plannerData.id)
+                  
+                  if (error) throw error
+                  
+                  // Reset form
+                  setPlannerData({
+                    month: getFirstDayOfMonth(currentMonth),
+                    focus_theme: '',
+                    goals: [],
+                    priorities: [],
+                    notes: '',
+                    gratitude_list: [],
+                  })
+                  alert('Planner deleted!')
+                } catch (error) {
+                  console.error('Error deleting:', error)
+                  alert('Failed to delete')
+                }
+              }
+            }}
+            className="px-6 py-4 bg-red-500 text-white rounded-2xl font-bold shadow-lg hover:bg-red-600 transition-all"
+          >
+            🗑️ Delete
+          </button>
+        )}
+      </motion.div>
+
+      {/* Save Status Toast */}
       {isSaving && (
-        <div className="fixed bottom-6 right-6 bg-green-500 text-white px-6 py-3 rounded-full shadow-lg">
+        <div className="fixed bottom-6 right-6 bg-blue-500 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
           Saving...
+        </div>
+      )}
+      
+      {saveSuccess && !isSaving && (
+        <div className="fixed bottom-6 right-6 bg-green-500 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          Saved successfully!
         </div>
       )}
     </div>

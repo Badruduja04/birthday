@@ -45,6 +45,44 @@ export default function DailyJournal({ userId }: DailyJournalProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [recentDates, setRecentDates] = useState<string[]>([])
+  const [recentEntries, setRecentEntries] = useState<JournalData[]>([])
+  const [showHistory, setShowHistory] = useState(false)
+
+  // Load recent journal dates and full entries
+  useEffect(() => {
+    const loadRecentDates = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('daily_journals')
+          .select('*')
+          .eq('user_id', userId)
+          .order('date', { ascending: false })
+          .limit(10)
+
+        if (error) throw error
+
+        if (data) {
+          setRecentDates(data.map(d => d.date))
+          setRecentEntries(data.map(d => ({
+            id: d.id,
+            date: d.date,
+            todo_list: d.todo_list || [],
+            completed_list: d.completed_list || [],
+            mood_morning: d.mood_morning || '',
+            mood_evening: d.mood_evening || '',
+            comment: d.comment || '',
+            photo_url: d.photo_url,
+          })))
+        }
+      } catch (error) {
+        console.error('Error loading recent dates:', error)
+      }
+    }
+
+    loadRecentDates()
+  }, [userId, saveSuccess])
 
   // Load journal data for selected date
   useEffect(() => {
@@ -96,30 +134,75 @@ export default function DailyJournal({ userId }: DailyJournalProps) {
     }
   }
 
-  const saveJournalData = async (updatedData: Partial<JournalData>) => {
+  const saveJournalData = async (updatedData: Partial<JournalData> = {}) => {
     setIsSaving(true)
+    setSaveSuccess(false)
+    
     try {
+      // Merge current data with updates
+      const mergedData = { ...journalData, ...updatedData }
+      
       const dataToSave = {
         user_id: userId,
-        ...journalData,
-        ...updatedData,
         date: selectedDate,
+        todo_list: mergedData.todo_list,
+        completed_list: mergedData.completed_list,
+        mood_morning: mergedData.mood_morning || null,
+        mood_evening: mergedData.mood_evening || null,
+        comment: mergedData.comment || null,
+        photo_url: mergedData.photo_url || null,
       }
+
+      console.log('Saving journal data:', dataToSave)
 
       const { data, error } = await supabase
         .from('daily_journals')
-        .upsert(dataToSave, { onConflict: 'user_id,date' })
+        .upsert(dataToSave, { 
+          onConflict: 'user_id,date',
+          ignoreDuplicates: false 
+        })
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase error:', error)
+        throw error
+      }
 
       if (data) {
-        setJournalData(prev => ({ ...prev, id: data.id }))
+        console.log('Journal saved successfully:', data)
+        
+        // Reload recent dates to show this entry
+        const { data: recentData } = await supabase
+          .from('daily_journals')
+          .select('date')
+          .eq('user_id', userId)
+          .order('date', { ascending: false })
+          .limit(10)
+        
+        if (recentData) {
+          setRecentDates(recentData.map(d => d.date))
+        }
+        
+        setSaveSuccess(true)
+        
+        // Reset form after save (clear inputs for new entry)
+        setTimeout(() => {
+          setJournalData({
+            date: selectedDate,
+            todo_list: [],
+            completed_list: [],
+            mood_morning: '',
+            mood_evening: '',
+            comment: '',
+            photo_url: null,
+          })
+          setSaveSuccess(false)
+        }, 2000) // Wait 2 seconds so user sees success message
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving journal:', error)
-      alert('Failed to save. Please try again.')
+      alert(`Failed to save journal: ${error.message || 'Please check database setup'}`)
     } finally {
       setIsSaving(false)
     }
@@ -129,7 +212,6 @@ export default function DailyJournal({ userId }: DailyJournalProps) {
     if (newTodo.trim()) {
       const updated = [...journalData.todo_list, newTodo.trim()]
       setJournalData(prev => ({ ...prev, todo_list: updated }))
-      saveJournalData({ todo_list: updated })
       setNewTodo('')
     }
   }
@@ -137,14 +219,12 @@ export default function DailyJournal({ userId }: DailyJournalProps) {
   const removeTodo = (index: number) => {
     const updated = journalData.todo_list.filter((_, i) => i !== index)
     setJournalData(prev => ({ ...prev, todo_list: updated }))
-    saveJournalData({ todo_list: updated })
   }
 
   const addCompleted = () => {
     if (newCompleted.trim()) {
       const updated = [...journalData.completed_list, newCompleted.trim()]
       setJournalData(prev => ({ ...prev, completed_list: updated }))
-      saveJournalData({ completed_list: updated })
       setNewCompleted('')
     }
   }
@@ -152,45 +232,55 @@ export default function DailyJournal({ userId }: DailyJournalProps) {
   const removeCompleted = (index: number) => {
     const updated = journalData.completed_list.filter((_, i) => i !== index)
     setJournalData(prev => ({ ...prev, completed_list: updated }))
-    saveJournalData({ completed_list: updated })
   }
 
   const selectMood = (time: 'morning' | 'evening', mood: string) => {
     const key = time === 'morning' ? 'mood_morning' : 'mood_evening'
     setJournalData(prev => ({ ...prev, [key]: mood }))
-    saveJournalData({ [key]: mood })
   }
 
   const updateComment = (comment: string) => {
     setJournalData(prev => ({ ...prev, comment }))
   }
 
-  const saveComment = () => {
-    saveJournalData({ comment: journalData.comment })
+  const loadEntryFromHistory = (entry: JournalData) => {
+    setSelectedDate(entry.date)
+    setJournalData(entry)
+    setShowHistory(false)
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const uploadPhoto = async (file: File) => {
+  const uploadPhoto = async (file: File): Promise<void> => {
     setUploadingPhoto(true)
     try {
       const fileExt = file.name.split('.').pop()
       const fileName = `${userId}-${Date.now()}.${fileExt}`
-      const filePath = `daily-journal/${fileName}`
+      const filePath = `daily-journal/${fileName}` // Add prefix for organization
 
       const { error: uploadError } = await supabase.storage
-        .from('daily-journal-photos')
-        .upload(filePath, file)
+        .from('diary-images')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        })
 
-      if (uploadError) throw uploadError
+      if (uploadError) {
+        console.error('Upload error:', uploadError)
+        throw uploadError
+      }
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('daily-journal-photos')
+      // Get public URL
+      const { data } = supabase.storage
+        .from('diary-images')
         .getPublicUrl(filePath)
 
-      setJournalData(prev => ({ ...prev, photo_url: publicUrl }))
-      saveJournalData({ photo_url: publicUrl })
-    } catch (error) {
+      console.log('Photo uploaded successfully:', data.publicUrl)
+      setJournalData(prev => ({ ...prev, photo_url: data.publicUrl }))
+    } catch (error: any) {
       console.error('Error uploading photo:', error)
-      alert('Failed to upload photo')
+      alert(`Failed to upload photo: ${error.message || 'Check storage bucket exists.'}`)
+      throw error
     } finally {
       setUploadingPhoto(false)
     }
@@ -206,19 +296,58 @@ export default function DailyJournal({ userId }: DailyJournalProps) {
 
   return (
     <div className="space-y-6">
-      {/* Date Picker */}
+      {/* Date Picker with Recent History */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="bg-white/10 backdrop-blur-md rounded-2xl p-6 shadow-lg border border-white/20"
       >
-        <label className="block text-white/80 text-sm font-medium mb-2">Date:</label>
+        <div className="flex items-center justify-between mb-4">
+          <label className="block text-white/80 text-sm font-medium">Date:</label>
+          {journalData.id && (
+            <div className="flex items-center gap-2 text-green-400 text-xs font-medium">
+              <Check size={14} />
+              <span>Entry exists for this date</span>
+            </div>
+          )}
+        </div>
         <input
           type="date"
           value={selectedDate}
           onChange={(e) => setSelectedDate(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-pink-400"
+          className="w-full px-4 py-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-pink-400 mb-4"
         />
+        
+        {/* Recent Journal Entries */}
+        {recentDates.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-white/60 text-xs font-medium">Recent entries ({recentDates.length}):</p>
+            <div className="flex gap-2 flex-wrap">
+              {recentDates.map(date => (
+                <button
+                  key={date}
+                  onClick={() => setSelectedDate(date)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    selectedDate === date
+                      ? 'bg-pink-500 text-white shadow-lg'
+                      : 'bg-white/20 text-white/80 hover:bg-white/30'
+                  }`}
+                >
+                  {new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric'
+                  })}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {recentDates.length === 0 && (
+          <div className="text-white/50 text-sm italic mt-2">
+            No journal entries yet. Start writing your first entry!
+          </div>
+        )}
       </motion.div>
 
       <div className="grid md:grid-cols-2 gap-6">
@@ -376,7 +505,6 @@ export default function DailyJournal({ userId }: DailyJournalProps) {
         <textarea
           value={journalData.comment}
           onChange={(e) => updateComment(e.target.value)}
-          onBlur={saveComment}
           placeholder="Write your thoughts about today..."
           rows={5}
           className="w-full px-4 py-3 rounded-xl bg-white/60 border border-gray-300 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-pink-400 resize-none"
@@ -388,7 +516,7 @@ export default function DailyJournal({ userId }: DailyJournalProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6 }}
-        className="bg-peach-100/90 backdrop-blur-md rounded-3xl p-6 shadow-lg"
+        className="bg-pink-100/90 backdrop-blur-md rounded-3xl p-6 shadow-lg"
       >
         <h3 className="text-lg font-bold text-gray-800 mb-4">Photo of the day</h3>
         
@@ -398,6 +526,10 @@ export default function DailyJournal({ userId }: DailyJournalProps) {
               src={journalData.photo_url}
               alt="Photo of the day"
               className="w-full h-64 object-cover rounded-2xl"
+              onError={(e) => {
+                console.error('Image load error:', journalData.photo_url)
+                e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23ddd" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle"%3EImage not found%3C/text%3E%3C/svg%3E'
+              }}
             />
             <button
               onClick={() => {
@@ -416,13 +548,23 @@ export default function DailyJournal({ userId }: DailyJournalProps) {
               accept="image/*"
               onChange={(e) => {
                 const file = e.target.files?.[0]
-                if (file) uploadPhoto(file)
+                if (file) {
+                  uploadPhoto(file).then(() => {
+                    // Auto-save after upload completes
+                    setTimeout(() => {
+                      saveJournalData({})
+                    }, 500)
+                  })
+                }
               }}
               className="hidden"
               disabled={uploadingPhoto}
             />
             {uploadingPhoto ? (
-              <div className="text-gray-600">Uploading...</div>
+              <div className="flex flex-col items-center gap-2">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500"></div>
+                <div className="text-gray-600">Uploading...</div>
+              </div>
             ) : (
               <>
                 <Camera size={40} className="text-gray-400 mb-2" />
@@ -433,10 +575,186 @@ export default function DailyJournal({ userId }: DailyJournalProps) {
         )}
       </motion.div>
 
-      {/* Save Status */}
+      {/* Manual Save Button */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.7 }}
+        className="flex gap-3"
+      >
+        <button
+          onClick={() => saveJournalData({})}
+          disabled={isSaving}
+          className="flex-1 px-6 py-4 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isSaving ? 'Saving...' : '💾 Save Journal'}
+        </button>
+        
+        <button
+          onClick={() => setShowHistory(!showHistory)}
+          className="px-6 py-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all"
+        >
+          📚 History ({recentEntries.length})
+        </button>
+        
+        {journalData.id && (
+          <button
+            onClick={async () => {
+              if (confirm('Delete this journal entry?')) {
+                try {
+                  const { error } = await supabase
+                    .from('daily_journals')
+                    .delete()
+                    .eq('id', journalData.id)
+                  
+                  if (error) throw error
+                  
+                  // Reset form
+                  setJournalData({
+                    date: selectedDate,
+                    todo_list: [],
+                    completed_list: [],
+                    mood_morning: '',
+                    mood_evening: '',
+                    comment: '',
+                    photo_url: null,
+                  })
+                  
+                  // Reload recent dates
+                  const { data: recentData } = await supabase
+                    .from('daily_journals')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .order('date', { ascending: false })
+                    .limit(10)
+                  
+                  if (recentData) {
+                    setRecentDates(recentData.map(d => d.date))
+                    setRecentEntries(recentData.map(d => ({
+                      id: d.id,
+                      date: d.date,
+                      todo_list: d.todo_list || [],
+                      completed_list: d.completed_list || [],
+                      mood_morning: d.mood_morning || '',
+                      mood_evening: d.mood_evening || '',
+                      comment: d.comment || '',
+                      photo_url: d.photo_url,
+                    })))
+                  }
+                  
+                  alert('Journal deleted successfully!')
+                } catch (error) {
+                  console.error('Error deleting:', error)
+                  alert('Failed to delete')
+                }
+              }
+            }}
+            className="px-6 py-4 bg-red-500 text-white rounded-2xl font-bold shadow-lg hover:bg-red-600 transition-all"
+          >
+            🗑️ Delete
+          </button>
+        )}
+      </motion.div>
+
+      {/* Journal History */}
+      {showHistory && recentEntries.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white/10 backdrop-blur-md rounded-2xl p-6 shadow-lg border border-white/20"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-bold text-white">📚 Journal History</h3>
+            <button
+              onClick={() => setShowHistory(false)}
+              className="text-white/60 hover:text-white transition-colors"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {recentEntries.map((entry) => (
+              <motion.div
+                key={entry.id}
+                whileHover={{ scale: 1.02 }}
+                className="bg-white/10 rounded-xl p-4 cursor-pointer hover:bg-white/20 transition-all"
+                onClick={() => loadEntryFromHistory(entry)}
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <h4 className="text-white font-bold">
+                      {new Date(entry.date + 'T00:00:00').toLocaleDateString('en-US', {
+                        weekday: 'short',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </h4>
+                    <div className="flex gap-2 mt-1">
+                      {entry.mood_morning && (
+                        <span className="text-xs text-white/70">
+                          Morning: {MOODS.find(m => m.value === entry.mood_morning)?.emoji}
+                        </span>
+                      )}
+                      {entry.mood_evening && (
+                        <span className="text-xs text-white/70">
+                          Evening: {MOODS.find(m => m.value === entry.mood_evening)?.emoji}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    {entry.photo_url && <span className="text-white/70">📸</span>}
+                    {entry.todo_list.length > 0 && (
+                      <span className="text-xs text-white/70 bg-white/20 px-2 py-1 rounded">
+                        {entry.todo_list.length} todos
+                      </span>
+                    )}
+                    {entry.completed_list.length > 0 && (
+                      <span className="text-xs text-white/70 bg-green-500/30 px-2 py-1 rounded">
+                        ✓ {entry.completed_list.length}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                {entry.comment && (
+                  <p className="text-white/70 text-sm line-clamp-2 mt-2">
+                    {entry.comment}
+                  </p>
+                )}
+                
+                <div className="mt-2 text-xs text-white/50">
+                  Click to edit
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Save Status Toast */}
       {isSaving && (
-        <div className="fixed bottom-6 right-6 bg-green-500 text-white px-6 py-3 rounded-full shadow-lg">
+        <div className="fixed bottom-6 right-6 bg-blue-500 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
           Saving...
+        </div>
+      )}
+      
+      {saveSuccess && !isSaving && (
+        <div className="fixed bottom-6 right-6 bg-green-500 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2">
+          <Check size={20} />
+          <div className="flex flex-col">
+            <span className="font-bold">Saved successfully!</span>
+            <span className="text-xs text-white/80">
+              {new Date().toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: '2-digit'
+              })}
+            </span>
+          </div>
         </div>
       )}
     </div>
